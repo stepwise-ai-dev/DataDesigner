@@ -999,17 +999,23 @@ async def test_scheduler_non_llm_holds_submission_slot() -> None:
     row_groups = [(0, 3)]
     tracker = CompletionTracker.with_graph(graph, row_groups)
 
+    max_llm_wait = 2
     scheduler = AsyncTaskScheduler(
         generators=generators,
         graph=graph,
         tracker=tracker,
         row_groups=row_groups,
         max_submitted_tasks=2,
-        max_llm_wait_tasks=2,
+        max_llm_wait_tasks=max_llm_wait,
     )
     await scheduler.run()
 
     assert tracker.is_row_group_complete(0, 3, ["seed", "cell_out"])
+
+    _, llm_available = scheduler.get_semaphore_permits()
+    assert llm_available == max_llm_wait, (
+        f"LLM-wait semaphore was consumed by non-LLM task: available={llm_available}, expected={max_llm_wait}"
+    )
 
 
 @pytest.mark.asyncio(loop_scope="session")
